@@ -6,7 +6,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Windows.Forms;
+using Vlc.DotNet.Core;
 using Vlc.DotNet.Forms;
 
 namespace CameraViewer
@@ -48,10 +50,11 @@ namespace CameraViewer
             switch (item.Text)
             {
                 case "Exit":
-                    foreach(VlcControl control in VlcControlList)
+                    foreach (VlcControl control in VlcControlList)
                     {
                         control.Stop();
                     }
+
                     form3.Close();
                     break;
 
@@ -321,7 +324,7 @@ namespace CameraViewer
             Screen screenToUse = Screen.AllScreens[screen];
 
             form3.FormBorderStyle = FormBorderStyle.None;
-            //form3.Icon = Properties.Resources.DispatchViewer;
+            form3.Icon = Properties.Resources.DispatchViewer;
             form3.WindowState = FormWindowState.Maximized;
             form3.BackColor = Color.Black;
             form3.FormClosed += new FormClosedEventHandler(Form_Closing);
@@ -381,29 +384,47 @@ namespace CameraViewer
                         vlcControl.VlcLibDirectory = vlcLibDirectory;
                         vlcControl.VlcMediaplayerOptions = new[] { "-vvv" };
                         vlcControl.EndInit();
+                        vlcControl.SetMedia(urlPanel.Url);
 
-                        vlcControl.Play(urlPanel.Url);
+                        vlcControl.Play();
                         vlcControl.Enabled = true;
-                        vlcControl.VlcMediaPlayer.Play(urlPanel.Url);
 
                         vlcControl.Dock = DockStyle.None;
-                        vlcControl.Size = new Size(ScreenW / cols, (ScreenH / rows) - 20);
-                        vlcControl.Location = new Point((ScreenW / cols) * j, (ScreenH / rows) * i + 20);
+                        vlcControl.Size = new Size(ScreenW / cols, (ScreenH / rows) - 30);
+                        vlcControl.Location = new Point((ScreenW / cols) * j, (ScreenH / rows) * i + 30);
 
                         #region Label
-                        Label AddressLabel = new Label();
-                        AddressLabel.Text = (urlPanel.Label != String.Empty) ? urlPanel.Label : urlPanel.Url;
-                        AddressLabel.Height = 20;
-                        AddressLabel.Font = new Font(AddressLabel.Font.FontFamily, 14);
-                        AddressLabel.ForeColor = Color.White;
-                        AddressLabel.Tag = vlcControl;
-                        AddressLabel.Cursor = Cursors.Hand;
-                        AddressLabel.AutoSize = true;
+                        Label AddressLabel = new Label
+                        {
+                            Text = (urlPanel.Label != String.Empty) ? urlPanel.Label : urlPanel.Url,
+                            Height = 30,
+                            Width = (ScreenW / cols) / 3,
 
+                            Font = new Font(Font.FontFamily, 16),
+                            ForeColor = Color.White,
+                            Cursor = Cursors.Hand,
+                            AutoEllipsis = true,
+
+                            Tag = vlcControl,
+                            Location = new Point((ScreenW / cols) * j, (ScreenH / rows) * i)
+                        };
                         AddressLabel.Click += new EventHandler(Label_Clicked);
-                        #endregion
-                        AddressLabel.Location = new Point((ScreenW / cols) * j, (ScreenH / rows) * i);
 
+                        #endregion
+
+                        Button button1 = new Button
+                        {
+                            Text = "Rec.",
+                            BackColor = Color.White,
+                            Height = 30,
+                            Width = 65,
+                            Font = new Font(Font.FontFamily, 10),
+                            Location = new Point(AddressLabel.Right + 15, AddressLabel.Location.Y),
+                            Tag = vlcControl
+                        };
+                        button1.Click += button1_Click;
+
+                        form3.Controls.Add(button1);
                         form3.Controls.Add(AddressLabel);
                         form3.Controls.Add(vlcControl);
                         VlcControlList.Add(vlcControl);
@@ -418,6 +439,29 @@ namespace CameraViewer
 
             form3.Show();
             formOpen = true;
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            Button btn = (Button)sender;
+            VlcControl control = (VlcControl)btn.Tag;
+            VlcMedia media = control.GetCurrentMedia();
+
+            if (btn.Text == "Rec.")
+            {
+                control.Stop();
+                string[] prms = new string[] { ":sout=#duplicate{dst=std{access=file,mux=mp4,dst='" + media.Title.Substring(7).Replace("/", "_").Replace(":", "-") + ".mp4'},dst=display}" };
+                control.Play(new Uri(media.Mrl), prms);
+                control.Refresh();
+                btn.Text = "Stop";
+            }
+            else
+            {
+                control.Stop();
+                string[] prms = new string[] { "" };
+                control.Play(new Uri(media.Mrl), prms);
+                btn.Text = "Rec.";
+            }
         }
 
         void RemovePanel(object sender, EventArgs e)
